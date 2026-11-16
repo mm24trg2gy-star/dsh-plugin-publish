@@ -1,0 +1,41 @@
+# 发布模板：复制到插件仓库的 .github/workflows/publish.yml
+# 推 v* 标签时自动发布到 npm（Trusted Publishing / OIDC），不需要 token。
+#
+# 前置（每包一次）：
+#   1. 包已在 npm 上存在（首次需手工发布一次）
+#   2. npm 包页面 → Settings → Trusted Publisher：
+#      GitHub Actions / <owner> / <repo> / publish.yml / Environment 留空
+#      Allowed actions 勾上 Allow npm publish（需要改 tag 就再勾 dist-tag）
+#
+# 说明：npm 校验的是「仓库 + 工作流文件名」，所以每个仓库都要有自己的一份
+# publish.yml（文件名必须叫这个），不要用跨仓库的 reusable workflow。
+name: publish
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Trusted Publishing 需要 npm >= 11.5.1
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
+      # 有测试就打开；没有就删掉这一步
+      - name: Smoke test
+        run: node tests/host.smoke.mjs
+
+      - name: Publish
+        run: npm publish --provenance --access public
